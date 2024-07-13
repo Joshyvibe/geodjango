@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submit Your Location</title>
+    <!-- Include Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        #map {
+            height: 400px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        label {
+            width: 100px;
+            text-align: right;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            padding: 8px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            flex: 1;
+            min-width: 200px;
+            box-sizing: border-box;
+        }
+        button[type="submit"] {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Submit Your Location</h1>
+        <form id="locationForm">
+            <label for="latitude">Latitude:</label>
+            <input type="text" id="latitude" name="latitude" readonly>
+            <label for="longitude">Longitude:</label>
+            <input type="text" id="longitude" name="longitude" readonly>
+            <button type="submit">Submit Location</button>
+        </form>
+        <br>
+        
+        <div id="map"></div>
+        
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Search for a location" style="margin-top: 10px;">
+            <button id="searchButton">Search</button>
+        </div>
+    </div>
+
+    <!-- Include Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([51.505, -0.09], 13); // Default to London coordinates
+
+        // Initialize tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Add a marker to the map (default to London coordinates)
+        var marker = L.marker([51.505, -0.09], { draggable: true }).addTo(map);
+
+        // Function to update latitude and longitude inputs based on marker position
+        function updateMarker(lat, lng) {
+            marker.setLatLng([lat, lng]);
+            document.getElementById('latitude').value = lat.toFixed(6);
+            document.getElementById('longitude').value = lng.toFixed(6);
+        }
+
+        // Handle click event on the map
+        map.on('click', function(e) {
+            updateMarker(e.latlng.lat, e.latlng.lng);
+        });
+
+        // Handle marker drag event
+        marker.on('drag', function(e) {
+            updateMarker(marker.getLatLng().lat, marker.getLatLng().lng);
+        });
+
+        // Handle form submission
+        document.getElementById('locationForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var latitude = document.getElementById('latitude').value;
+            var longitude = document.getElementById('longitude').value;
+            var formData = new FormData();
+            formData.append('latitude', latitude);
+            formData.append('longitude', longitude);
+
+            fetch('/submit_location/', {
+                method: 'POST',
+                body: formData
+            }).then(function(response) {
+                alert('Location submitted successfully!');
+            }).catch(function(error) {
+                console.error('Error submitting location:', error);
+            });
+        });
+
+        // Function to perform search using OpenStreetMap Nominatim API
+        function performSearch(query) {
+            fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + query)
+                .then(function(response) {
+                    return response.json();
+                })
+                .then(function(data) {
+                    if (data && data.length > 0) {
+                        var result = data[0]; // Use the first result
+                        var lat = parseFloat(result.lat);
+                        var lon = parseFloat(result.lon);
+                        
+                        // Set map view to the searched location
+                        map.setView([lat, lon], 13);
+                        updateMarker(lat, lon); // Update marker position
+                        
+                    } else {
+                        console.error('Location not found');
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error searching location:', error);
+                });
+        }
+
+        // Hook up the search button click event
+        document.getElementById('searchButton').addEventListener('click', function() {
+            var query = document.getElementById('searchInput').value;
+            performSearch(query);
+        });
+
+        // Attempt to get user's current location using geolocation API
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                var userLatLng = [position.coords.latitude, position.coords.longitude];
+
+                // Set map view to user's current location
+                map.setView(userLatLng, 13);
+                updateMarker(userLatLng[0], userLatLng[1]);
+
+            }, function(error) {
+                console.error('Error getting user location:', error);
+            });
+        } else {
+            console.error('Geolocation is not supported by this browser.');
+        }
+    </script>
+</body>
+</html>
